@@ -74,9 +74,9 @@ select:focus-visible {
   flex-shrink: 0;
 }
 .wordmark {
-  font:
-    600 22px/1.2 Georgia,
-    serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.045em;
 }
 .topbar nav,
