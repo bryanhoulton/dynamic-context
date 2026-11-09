@@ -1,4 +1,4 @@
-# Dynamic context engineering
+# Dynamic Context Engineering
 
 Three interactive experiments ask the same question: what happens if part of a language model’s input can change *after* decoding starts?
 
