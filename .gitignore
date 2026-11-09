@@ -1,60 +1,15 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
 .venv/
-venv/
-ENV/
-env/
-
-# uv
 .uv/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# Environment
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+node_modules/
 .env
 .env.local
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project specific
-results/
-data/
-
-# Frontend
-frontend/node_modules/
-frontend/.vercel/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Modal
+.vercel/
 .modal/
-.vercel
+.DS_Store

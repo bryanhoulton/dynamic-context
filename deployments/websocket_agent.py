@@ -13,7 +13,6 @@ import base64
 import json
 import os
 import time
-from pathlib import Path
 
 import modal
 
@@ -21,7 +20,6 @@ MODEL_ID = "Qwen/Qwen3-8B"
 APP_NAME = "websocket-voice-agent"
 ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 
-package_path = Path(__file__).parent.parent / "streaming_memory"
 
 app = modal.App(APP_NAME)
 
@@ -37,13 +35,12 @@ image = (
         "huggingface_hub",
         "fastapi[standard]",
         "websockets",
-        "deepgram-sdk",
+        "deepgram-sdk==6.1.1",
         extra_options="--no-cache-dir",
     )
     .run_commands(
         f"python -c \"from huggingface_hub import snapshot_download; snapshot_download('{MODEL_ID}', ignore_patterns=['*.gguf'])\""
     )
-    .add_local_dir(package_path, "/root/streaming_memory")
 )
 
 SYSTEM_PROMPT = """You're a friend listening to someone tell you a story. Keep responses concise - just a few sentences."""

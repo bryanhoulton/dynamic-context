@@ -1,37 +1,20 @@
-export const API_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://orin-labs--streaming-memory-familyassistant-serve.modal.run';
-
-export const SUPERMEMORY_API_URL =
+export const MEMORY_API =
   import.meta.env.VITE_SUPERMEMORY_API_URL ||
-  'https://orin-labs--streaming-memory-supermemory-familyassistants-a06a7b.modal.run';
+  'https://orin-labs--dynamic-context-memory.us-east.modal.run';
+export const LOCAL_POOL_API =
+  import.meta.env.VITE_API_URL ||
+  'https://orin-labs--dynamic-context-local.us-east.modal.run';
+export const VOICE_API =
+  import.meta.env.VITE_VOICE_API_URL ||
+  'https://bryanhoulton--websocket-voice-agent-voiceagent-web-app.modal.run';
 
-export const SYSTEM_PROMPT = [
-  'You are a helpful personal assistant who has access to the user\'s memories and notes.',
-  '',
-  'You help them think through decisions by drawing on what you know about their life, relationships, and past experiences.',
-  '',
-  'When memories are provided, use them naturally to inform your responses. Make connections between different memories when relevant.',
-  '',
-  'Think step by step in <think>...</think> tags before responding.',
-  '',
-  'Be warm and helpful, like a thoughtful friend who knows them well.',
-  '',
-  'Important: Do not use emojis in your responses.',
-].join('\n');
-
-export const DEMO_CONFIG = {
-  name: 'Family Assistant',
-  eyebrow: 'Streaming memory demo',
-  headline: 'The engine keeps rewriting the model input during generation.',
-  description:
-    'Watch the context window change in-place while the answer keeps streaming. Each revision updates the next prompt the model sees.',
-  memoryDescription:
-    'Your assistant has access to ~280 memories spanning family, work, hobbies, and daily life.',
-  placeholder: 'Ask for advice or help planning...',
-  suggestedQuestions: [
-    'I\'m feeling anxious about work lately, any advice?',
-    'Help me figure out what to do about my apartment lease',
-    'What could I get mom for her birthday?',
-  ],
+export const questions = [
+  'Should I renew my apartment lease? Give me one reason to stay and one to move.',
+  'What birthday gift would Mom actually use?',
+  'What are Mom and Dad looking forward to on their anniversary trip?',
+];
+export const defaults = {
+  update_every_n: 10,
+  lookback_tokens: 60,
+  max_memories: 3,
 };
