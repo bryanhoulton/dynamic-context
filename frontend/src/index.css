@@ -233,14 +233,10 @@ summary {
   max-height: 240px;
   overflow: auto;
 }
-.inspector-title,
 .timeline {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.inspector-title {
-  justify-content: space-between;
 }
 .timeline {
   margin: 12px 0;

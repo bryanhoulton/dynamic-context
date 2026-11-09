@@ -21,6 +21,7 @@ function playPcm(session, encoded) {
 }
 function release(s) {
   if (!s) return;
+  s.controller.abort();
   clearTimeout(s.timeout);
   if (s.ws) {
     s.ws.onmessage = s.ws.onerror = s.ws.onclose = null;
@@ -64,6 +65,7 @@ export function useWebSocketVoice(serverUrl) {
   async function start() {
     if (session.current) return;
     const s = {
+      controller: new AbortController(),
       playAt: 0,
       completed: false,
       turn: { transcript: '', plan: '', answer: '' },
@@ -101,15 +103,26 @@ export function useWebSocketVoice(serverUrl) {
       };
       s.source.connect(s.capture).connect(s.ctx.destination);
       setStage('connecting');
-      const url = new URL(serverUrl);
-      url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:';
-      url.pathname = url.pathname.replace(/\/$/, '') + '/ws';
-      const ws = new WebSocket(url);
-      s.ws = ws;
+      // An HTTP request can wait for a cold GPU before the browser's shorter
+      // WebSocket upgrade deadline begins. Cancellation releases both transports.
       s.timeout = setTimeout(() => {
         if (session.current === s && !s.ready)
-          end('The voice service took too long to connect. Try again.');
-      }, 90000);
+          end('The voice service took too long to start. Please try again.');
+      }, 240000);
+      const url = new URL(
+        serverUrl.endsWith('/') ? serverUrl : serverUrl + '/',
+      );
+      const health = await fetch(new URL('health', url), {
+        signal: s.controller.signal,
+        cache: 'no-store',
+      });
+      if (!health.ok || (await health.json()).status !== 'ok')
+        throw Error('The voice model is unavailable. Please try again.');
+      if (session.current !== s) return;
+      const socketUrl = new URL('ws', url);
+      socketUrl.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:';
+      const ws = new WebSocket(socketUrl);
+      s.ws = ws;
       ws.onclose = () => {
         if (session.current === s)
           end(
@@ -193,7 +206,7 @@ export function useWebSocketVoice(serverUrl) {
       if (session.current === s)
         end(
           err.name === 'NotAllowedError'
-            ? 'Microphone access was denied. Allow it in your browser, or inspect the recorded example.'
+            ? 'Microphone access was denied. Allow microphone access in your browser and try again.'
             : 'Could not start the voice session: ' + err.message,
         );
     }

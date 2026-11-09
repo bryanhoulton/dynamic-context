@@ -1,40 +1,41 @@
-import { useState } from 'react';
 import { Mic, MicOff } from 'lucide-react';
 import { Reasoning } from './components/Lab';
 import { Chat, ChatTurn } from './components/Chat';
 import { Button } from './components/ui/button';
 import { TranscriptInspector } from './components/TranscriptInspector';
 import { VOICE_API } from './demo/config';
-import example from './demo/voice-example.json';
 import { useWebSocketVoice } from './hooks/useWebSocketVoice';
 
 export default function Voice() {
   const v = useWebSocketVoice(VOICE_API);
-  const [recorded, setRecorded] = useState(false);
-  const [session, setSession] = useState(0);
-  const active = ['permission', 'connecting', 'live'].includes(v.stage);
-  const steps = recorded ? example.steps : v.steps;
-  function start() {
-    setRecorded(false);
-    setSession((n) => n + 1);
-    v.start();
+  const connecting = v.stage === 'permission' || v.stage === 'connecting';
+  const live = v.stage === 'live';
+  const active = connecting || live;
+  let title = 'Voice chat';
+  let description =
+    'Speak to Qwen3-8B and watch its plan change as you add details.';
+  if (connecting) {
+    title = 'Connecting…';
+    description =
+      v.stage === 'permission'
+        ? 'Allow microphone access to start the session.'
+        : 'Starting the voice service. The first connection can take a minute.';
+  } else if (live) {
+    title = v.muted ? 'Microphone muted' : 'Listening…';
+    description = v.muted
+      ? 'Unmute your microphone to speak.'
+      : 'Start speaking to see your words and the model’s plan.';
   }
   const composer = (
     <>
-      {active && (
+      {live && v.transcript && (
         <p role="status" className="muted">
-          {v.stage === 'live'
-            ? v.muted
-              ? 'Microphone muted'
-              : v.phase
-            : v.stage === 'connecting'
-              ? 'Connecting to the model…'
-              : 'Waiting for microphone access…'}
+          {v.muted ? 'Microphone muted' : v.phase}
         </p>
       )}
       <div className="voice-actions">
         {!active ? (
-          <Button onClick={start}>
+          <Button onClick={v.start}>
             <Mic />
             Start microphone
           </Button>
@@ -51,32 +52,21 @@ export default function Voice() {
             </button>
           </>
         )}
-        {!active && !recorded && (
-          <button className="link" onClick={() => setRecorded(true)}>
-            See a recorded example
-          </button>
-        )}
       </div>
       {v.error && <p role="alert">{v.error}</p>}
     </>
   );
   return (
     <Chat
-      title="Think while I speak."
+      title={title}
       icon={Mic}
-      description="Qwen3-8B starts planning while you speak. Try adding a detail that changes what it should say."
+      description={description}
       empty={!v.transcript}
       busy={active}
       composer={composer}
       aside={
-        steps.length > 0 && (
-          <TranscriptInspector
-            key={recorded ? 'recorded' : session}
-            steps={steps}
-            live={active}
-            recorded={recorded}
-            onClose={() => setRecorded(false)}
-          />
+        v.steps.length > 0 && (
+          <TranscriptInspector steps={v.steps} live={live} />
         )
       }
     >

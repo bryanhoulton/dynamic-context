@@ -25,26 +25,14 @@ function TranscriptChange({ step }) {
   );
 }
 
-export function TranscriptInspector({ steps, live, recorded, onClose }) {
+export function TranscriptInspector({ steps, live }) {
   const [pinned, setPinned] = useState(null);
   const index = Math.min(pinned ?? steps.length - 1, steps.length - 1);
   const step = steps[index];
   if (!step) return null;
   return (
     <section className="inspector" aria-label="Context inspector">
-      <div className="inspector-title">
-        <h2>Transcript changes</h2>
-        {recorded && (
-          <button className="link" onClick={onClose}>
-            Close example
-          </button>
-        )}
-      </div>
-      {recorded && (
-        <p className="muted">
-          Recorded example: a speaker learns the station is closed.
-        </p>
-      )}
+      <h2>Transcript changes</h2>
       <div className="timeline">
         <button
           aria-label="Previous change"

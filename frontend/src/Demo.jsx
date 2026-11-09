@@ -4,9 +4,8 @@ import { Chat, ChatInput, ChatTurn } from './components/Chat';
 import { InputGroupButton } from './components/ui/input-group';
 import { Highlighted, Reasoning } from './components/Lab';
 import { useDynamicContextDemo } from './hooks/useDynamicContextDemo';
-import { emptyRun, modelContext, readEvent } from './demo/stream';
+import { modelContext } from './demo/stream';
 import { questions } from './demo/config';
-import example from './demo/memory-example.json';
 
 function MemoryText({ text }) {
   // Key by the actual line so a retained note stays still when others are replaced.
@@ -52,51 +51,24 @@ function CopyContext({ run }) {
 
 export default function Demo({ api }) {
   const lab = useDynamicContextDemo(api);
-  const [frame, setFrame] = useState(null);
-  const recorded = frame !== null;
-  const playing = recorded && frame < example.length - 1;
-  useEffect(() => {
-    if (!playing) return;
-    const timer = setTimeout(() => setFrame(frame + 1), 950);
-    return () => clearTimeout(timer);
-  }, [frame, playing]);
-  const run = recorded
-    ? example.slice(0, frame + 1).reduce(readEvent, emptyRun())
-    : lab.run;
-  const busy = lab.busy;
+  const { run, busy } = lab;
   function send(e) {
     e.preventDefault();
     if (!lab.input.trim() || busy) return;
-    setFrame(null);
     lab.send();
   }
-  const tools = (
-    <>
-      {!run && (
-        <button
-          type="button"
-          className="link"
-          onClick={() =>
-            lab.setInput(
-              questions[(questions.indexOf(lab.input) + 1) % questions.length],
-            )
-          }
-        >
-          Another question
-        </button>
-      )}
-      {recorded ? (
-        <button type="button" className="link" onClick={() => setFrame(null)}>
-          Close recorded example
-        </button>
-      ) : (
-        !busy && (
-          <button type="button" className="link" onClick={() => setFrame(0)}>
-            See a recorded example
-          </button>
+  const tools = !run && (
+    <button
+      type="button"
+      className="link"
+      onClick={() =>
+        lab.setInput(
+          questions[(questions.indexOf(lab.input) + 1) % questions.length],
         )
-      )}
-    </>
+      }
+    >
+      Another question
+    </button>
   );
   return (
     <Chat
@@ -104,7 +76,7 @@ export default function Demo({ api }) {
       icon={BookOpen}
       description="Blue text shows the memories at the start of the model’s reasoning. Every 10 reasoning tokens, a new lookup can replace them."
       empty={!run}
-      busy={busy || playing}
+      busy={busy}
       composer={
         <ChatInput
           label="Question"

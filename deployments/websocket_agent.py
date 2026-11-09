@@ -28,13 +28,13 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
     .pip_install(
-        "vllm>=0.6",
-        "torch",
-        "transformers>=4.40",
-        "numpy",
-        "huggingface_hub",
-        "fastapi[standard]",
-        "websockets",
+        "vllm==0.13.0",
+        "torch==2.9.0",
+        "transformers==4.57.3",
+        "numpy==2.2.6",
+        "huggingface_hub==0.36.0",
+        "fastapi[standard]==0.128.0",
+        "websockets==15.0.1",
         "deepgram-sdk==6.1.1",
         extra_options="--no-cache-dir",
     )
@@ -60,15 +60,17 @@ class VoiceAgent:
     @modal.enter()
     def load_model(self):
         """Load model once when container starts - Modal optimizes this."""
+        from huggingface_hub import snapshot_download
         from transformers import AutoTokenizer
         from vllm import LLM
 
         print(f"[enter] Loading {MODEL_ID} with vLLM...")
         start = time.time()
 
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+        model_path = snapshot_download(MODEL_ID, local_files_only=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         self.llm = LLM(
-            model=MODEL_ID,
+            model=model_path,
             trust_remote_code=True,
             dtype="bfloat16",
             gpu_memory_utilization=0.9,
@@ -440,14 +442,6 @@ class VoiceAgent:
                 from deepgram.core.events import EventType
 
                 try:
-                    first_audio = await asyncio.wait_for(audio_queue.get(), timeout=30.0)
-                except asyncio.TimeoutError:
-                    return
-
-                if stop_generation.is_set():
-                    return
-
-                try:
                     client = AsyncDeepgramClient(api_key=deepgram_api_key)
 
                     deepgram_conn_ctx = client.listen.v2.connect(
@@ -544,12 +538,15 @@ class VoiceAgent:
                                 }))
 
                         connection.on(EventType.MESSAGE, on_deepgram_message)
-                        connection.on(EventType.ERROR, lambda err: print(f"[{session_id}] Deepgram error: {err}"))
+                        def on_speech_error(err):
+                            print(f"[{session_id}] Deepgram error: {err}")
+                            asyncio.create_task(send("error", {"message": "Speech recognition disconnected. Start a new session to reconnect."}))
+
+                        connection.on(EventType.ERROR, on_speech_error)
 
                         listen_task = asyncio.create_task(connection.start_listening())
 
-                        audio_bytes = base64.b64decode(first_audio)
-                        await connection._send(audio_bytes)
+                        await send("connected", {"session": session_id})
 
                         try:
                             while not stop_generation.is_set():
@@ -561,10 +558,13 @@ class VoiceAgent:
                                     continue
                         except Exception as e:
                             print(f"[{session_id}] Flux error: {e}")
+                            await send("error", {"message": "Speech recognition disconnected. Start a new session to reconnect."})
                         finally:
                             listen_task.cancel()
+                            await asyncio.gather(listen_task, return_exceptions=True)
 
                 except Exception as e:
+                    await send("error", {"message": "Could not connect to speech recognition. Please try again."})
                     print(f"[{session_id}] DeepGram Flux error: {e}")
                     import traceback
                     traceback.print_exc()
@@ -572,32 +572,21 @@ class VoiceAgent:
             streamer_task = asyncio.create_task(token_streamer())
             generation_task = asyncio.create_task(generate_with_transcript())
 
-            await send("status", {"message": "Container started", "stage": "container"})
-            await send("status", {"message": "Model ready", "stage": "model"})
-            await send("connected", {"session": session_id})
-            await send("status", {"message": "Ready! Start speaking.", "stage": "ready"})
+            receive_task = asyncio.create_task(receive_from_client())
+            deepgram_task = asyncio.create_task(run_deepgram())
 
             try:
-                receive_task = asyncio.create_task(receive_from_client())
-                deepgram_task = asyncio.create_task(run_deepgram())
-
-                done, pending = await asyncio.wait(
-                    [receive_task, deepgram_task],
-                    return_when=asyncio.FIRST_COMPLETED
-                )
-
+                await asyncio.wait([receive_task, deepgram_task], return_when=asyncio.FIRST_COMPLETED)
             except WebSocketDisconnect:
                 pass
             except Exception as e:
                 print(f"[{session_id}] Error: {e}")
             finally:
                 stop_generation.set()
-                for task in [generation_task, streamer_task]:
+                tasks = [receive_task, deepgram_task, generation_task, streamer_task]
+                for task in tasks:
                     task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
+                await asyncio.gather(*tasks, return_exceptions=True)
 
                 # Log timing metrics
                 if transcript_intervals:

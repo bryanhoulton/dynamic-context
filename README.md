@@ -21,8 +21,6 @@ yarn dev
 
 Open the Vite URL. On the first visit, choose Go in the introduction. Type a question, press Enter, then use Pause & edit. Shift+Enter inserts a line break. Memory uses the same chat composer and the hosted Supermemory-backed service. It first looks up the question. Every 10 generated reasoning tokens, it queries the last 60 reasoning tokens and replaces the memory block. Retrieval stops when the reasoning closes. Each question starts a fresh context. Voice connects to its WebSocket service only when you start the microphone. Microphone capture requires localhost or HTTPS.
 
-Memory and Voice each have a recorded example. The bundled excerpts come from real service responses: the first three lookups for the apartment-lease question (10-token interval, 60-token lookback, up to 3 notes), and three consecutive transcript revisions from synthesized speech about a station closure. Opening an excerpt makes no inference request.
-
 For a production build run `yarn build`; for the stream checks run `yarn test`. The CPU continuation tests run from the repository root with `uv run --with torch python -m unittest discover -s tests` (no model weights needed). Vercel rewrites direct links to the app. `/` opens Prompt; `/memory` and `/superdemo` open Memory. `/demo` preserves the original local-embedding retriever with the same UI. `/voice`, `/voice-ws` and `/voice-livekit` open the WebSocket Voice experiment.
 
 ## Services
