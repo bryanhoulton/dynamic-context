@@ -16,6 +16,8 @@ function playPcm(session, encoded) {
   source.buffer = buffer;
   source.connect(session.ctx.destination);
   const when = Math.max(session.ctx.currentTime, session.playAt);
+  session.playback.add(source);
+  source.onended = () => session.playback.delete(source);
   source.start(when);
   session.playAt = when + buffer.duration;
 }
@@ -33,17 +35,55 @@ function release(s) {
   if (s.ctx && s.ctx.state !== 'closed') s.ctx.close().catch(() => {});
 }
 
+function updateTurns(turns, event) {
+  const last = turns.at(-1);
+  if (event.type === 'transcript' && (!last || event.turn_id > last.id)) {
+    return [
+      ...turns,
+      {
+        id: event.turn_id,
+        transcript: event.full_transcript,
+        reasoning: '',
+        answer: '',
+        final: event.is_final,
+        complete: false,
+      },
+    ];
+  }
+  if (!last || last.id !== event.turn_id) return turns;
+  let next;
+  switch (event.type) {
+    case 'transcript':
+      next = {
+        ...last,
+        transcript: event.full_transcript,
+        final: event.is_final,
+      };
+      break;
+    case 'token':
+      next = {
+        ...last,
+        [event.is_thinking ? 'reasoning' : 'answer']: event.full_text,
+      };
+      break;
+    case 'response_complete':
+      next = { ...last, complete: true };
+      break;
+    case 'audio_error':
+      next = { ...last, audioError: true };
+      break;
+    default:
+      return turns;
+  }
+  return [...turns.slice(0, -1), next];
+}
+
 export function useWebSocketVoice(serverUrl) {
   const session = useRef(null);
   const [stage, setStage] = useState('idle');
   const [error, setError] = useState('');
   const [muted, setMuted] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [plan, setPlan] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [phase, setPhase] = useState('');
-  const [steps, setSteps] = useState([]);
-  const [previousTurns, setPreviousTurns] = useState([]);
+  const [turns, setTurns] = useState([]);
   useEffect(
     () => () => {
       const s = session.current;
@@ -67,19 +107,14 @@ export function useWebSocketVoice(serverUrl) {
     const s = {
       controller: new AbortController(),
       playAt: 0,
-      completed: false,
-      turn: { transcript: '', plan: '', answer: '' },
+      playback: new Set(),
+      turnId: null,
     };
     session.current = s;
-    setPreviousTurns([]);
+    setTurns([]);
     setStage('permission');
     setError('');
-    setSteps([]);
     setMuted(false);
-    setTranscript('');
-    setPlan('');
-    setAnswer('');
-    setPhase('Listening');
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       s.ctx = new AC();
@@ -143,59 +178,22 @@ export function useWebSocketVoice(serverUrl) {
             setStage('live');
             break;
           case 'transcript':
-            if (s.completed && !m.is_final) {
-              s.completed = false;
-              const previous = s.turn;
-              setPreviousTurns((turns) => [...turns, previous]);
-              s.turn = { transcript: '', plan: '', answer: '' };
-              setAnswer('');
-              setPlan('');
-              setSteps([]);
+            if (s.turnId === null || m.turn_id > s.turnId) {
+              // Stop queued speech as soon as the user begins the next turn.
+              for (const source of s.playback) source.stop();
+              s.playback.clear();
+              s.playAt = 0;
+              s.turnId = m.turn_id;
             }
-            s.turn.transcript = m.full_transcript ?? m.text;
-            setTranscript(s.turn.transcript);
-            break;
-          case 'context_injection':
-            setSteps((prev) => [
-              ...prev,
-              { before: m.old, after: m.new, prefix: '' },
-            ]);
-            break;
-          case 'context':
-            setSteps((prev) =>
-              !prev.at(-1)?.prefix && prev.length
-                ? [...prev.slice(0, -1), { ...prev.at(-1), prefix: m.prompt }]
-                : prev,
-            );
-            break;
-          case 'restart_thinking':
-            s.turn.plan = '';
-            s.turn.answer = '';
-            setPlan('');
-            setAnswer('');
-            break;
-          case 'thinking_start':
-            setPhase('Planning while listening');
-            break;
-          case 'thinking_stalled':
-            setPhase('Waiting for more speech');
-            break;
-          case 'thinking_unstalled':
-            setPhase('Planning while listening');
-            break;
-          case 'thinking_end':
-            setPhase('Generating reply');
+            setTurns((prev) => updateTurns(prev, m));
             break;
           case 'token':
-            s.turn[m.is_thinking ? 'plan' : 'answer'] += m.t;
-            (m.is_thinking ? setPlan : setAnswer)((t) => t + m.t);
-            break;
           case 'response_complete':
-            s.completed = true;
-            setPhase('Reply complete');
+          case 'audio_error':
+            setTurns((prev) => updateTurns(prev, m));
             break;
           case 'tts_audio':
-            playPcm(s, m.audio);
+            if (m.turn_id === s.turnId) playPcm(s, m.audio);
             break;
           case 'error':
             end(m.message || 'The voice service reported an error.');
@@ -220,14 +218,9 @@ export function useWebSocketVoice(serverUrl) {
   }
   return {
     stage,
-    phase,
     muted,
     error,
-    transcript,
-    previousTurns,
-    plan,
-    answer,
-    steps,
+    turns,
     start,
     end: () => end(),
     toggleMute,

@@ -23,11 +23,10 @@ export function Chat({
   busy,
   children,
   composer,
-  aside,
   icon: Icon = MessageCircleDashed,
 }) {
   return (
-    <div className={'workspace' + (aside ? ' with-inspector' : '')}>
+    <div className="workspace">
       <section className="thread" aria-label={title}>
         {empty ? (
           <div className="welcome">
@@ -50,7 +49,6 @@ export function Chat({
         )}
         <div className="composer-dock">{composer}</div>
       </section>
-      {aside && <aside className="context-aside">{aside}</aside>}
     </div>
   );
 }

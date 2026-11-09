@@ -2,7 +2,6 @@ import { Mic, MicOff } from 'lucide-react';
 import { Reasoning } from './components/Lab';
 import { Chat, ChatTurn } from './components/Chat';
 import { Button } from './components/ui/button';
-import { TranscriptInspector } from './components/TranscriptInspector';
 import { VOICE_API } from './demo/config';
 import { useWebSocketVoice } from './hooks/useWebSocketVoice';
 
@@ -11,9 +10,10 @@ export default function Voice() {
   const connecting = v.stage === 'permission' || v.stage === 'connecting';
   const live = v.stage === 'live';
   const active = connecting || live;
+  const latest = v.turns.at(-1);
   let title = 'Voice chat';
   let description =
-    'Speak to Qwen3-8B and watch its plan change as you add details.';
+    'Speak to Qwen3-8B. Follow its reasoning as you talk, then pause to hear its reply.';
   if (connecting) {
     title = 'Connecting…';
     description =
@@ -24,13 +24,17 @@ export default function Voice() {
     title = v.muted ? 'Microphone muted' : 'Listening…';
     description = v.muted
       ? 'Unmute your microphone to speak.'
-      : 'Start speaking to see your words and the model’s plan.';
+      : 'Start speaking to see your message and the model’s reasoning.';
   }
   const composer = (
     <>
-      {live && v.transcript && (
+      {live && latest && (
         <p role="status" className="muted">
-          {v.muted ? 'Microphone muted' : v.phase}
+          {v.muted
+            ? 'Microphone muted'
+            : latest.final && !latest.complete
+              ? 'Answering…'
+              : 'Listening…'}
         </p>
       )}
       <div className="voice-actions">
@@ -61,37 +65,31 @@ export default function Voice() {
       title={title}
       icon={Mic}
       description={description}
-      empty={!v.transcript}
+      empty={!latest}
       busy={active}
       composer={composer}
-      aside={
-        v.steps.length > 0 && (
-          <TranscriptInspector steps={v.steps} live={live} />
-        )
-      }
     >
-      {v.previousTurns.map((previous, i) => (
-        <ChatTurn key={i} id={'voice-' + i} question={previous.transcript}>
-          {previous.plan && (
-            <Reasoning title="Model’s plan" text={previous.plan} />
+      {v.turns.map((turn) => (
+        <ChatTurn
+          key={turn.id}
+          id={'voice-' + turn.id}
+          question={turn.transcript}
+        >
+          {turn.reasoning && (
+            <Reasoning
+              title="Reasoning"
+              text={turn.reasoning}
+              expanded={turn.id === latest.id}
+            />
           )}
-          {previous.answer && <p className="answer">{previous.answer}</p>}
+          {turn.answer && <p className="answer">{turn.answer}</p>}
+          {turn.audioError && (
+            <p role="status" className="muted">
+              Audio playback is unavailable for this reply.
+            </p>
+          )}
         </ChatTurn>
       ))}
-      <ChatTurn
-        key={v.previousTurns.length}
-        id={'voice-' + v.previousTurns.length}
-        question={v.transcript}
-      >
-        {v.plan && (
-          <Reasoning
-            title="Model’s plan"
-            text={v.plan}
-            expanded={active && !v.answer}
-          />
-        )}
-        {v.answer && <p className="answer">{v.answer}</p>}
-      </ChatTurn>
     </Chat>
   );
 }
