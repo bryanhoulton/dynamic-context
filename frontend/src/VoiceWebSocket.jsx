@@ -19,7 +19,7 @@ export default function Voice() {
     description =
       v.stage === 'permission'
         ? 'Allow microphone access to start the session.'
-        : 'Starting the voice service. The first connection can take a minute.';
+        : 'Cold-starting GPUs. THis may take a minute';
   } else if (live) {
     title = v.muted ? 'Microphone muted' : 'Listening…';
     description = v.muted
