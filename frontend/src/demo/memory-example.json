@@ -1,0 +1,39 @@
+[
+  {
+    "type": "context_start",
+    "prompt": "Should I renew my apartment lease? Give me one reason to stay and one to move.",
+    "prefix": "<|im_start|>user\nShould I renew my apartment lease? Give me one reason to stay and one to move.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "memory": "Here are some memories I remember about the user:\n- Considering moving due to ongoing building management failures regarding the elevator and potential lease renewal in August 2026.\n- Current apartment is preferred for its proximity to work and personalized setup.\n- Values stability and convenience over moving to new housing despite rising costs.\n\n"
+  },
+  {
+    "type": "output",
+    "thinking": "Based on this, the assistant's response would likely",
+    "closing": "",
+    "answer": "",
+    "end": ""
+  },
+  {
+    "type": "lookup",
+    "query": "Based on this, the assistant's response would likely",
+    "memory": "Here are some memories I remember about the user:\n- Father is using indirect 'hinting' behavior to signal his desire for the TaylorMade Qi10 driver, reflecting his preference for non-direct communication.\n- Father's method of signaling gift preferences through 'hints' suggests he prefers indirect communication regarding his needs.\n- Father's kitchen coffee maker stopped working on April 18, 2026, and he plans to research a replacement.\n\n"
+  },
+  {
+    "type": "output",
+    "thinking": "Based on this, the assistant's response would likely focus on indirect communication and the need for practical solutions",
+    "closing": "",
+    "answer": "",
+    "end": ""
+  },
+  {
+    "type": "lookup",
+    "query": "Based on this, the assistant's response would likely focus on indirect communication and the need for practical solutions",
+    "memory": "Here are some memories I remember about the user:\n- Father's method of signaling gift preferences through 'hints' suggests he prefers indirect communication regarding his needs.\n- Father is using indirect 'hinting' behavior to signal his desire for the TaylorMade Qi10 driver, reflecting his preference for non-direct communication.\n- Mother is using 'hinting' behavior by leaving hearing aid pamphlets around the house to encourage father to address his hearing loss.\n\n"
+  },
+  {
+    "type": "output",
+    "thinking": "Based on this, the assistant's response would likely focus on indirect communication and the need for practical solutions, such as providing subtle suggestions rather than direct advice",
+    "closing": "",
+    "answer": "",
+    "end": ""
+  }
+]

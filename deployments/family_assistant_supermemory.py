@@ -13,7 +13,7 @@ Deploy (stable URL):
     uv run modal deploy deployments/family_assistant_supermemory.py
 
 Then in ``frontend/.env.local``:
-    VITE_API_URL=https://<your-username>--streaming-memory-supermemory-familyassistantsupermemory-serve.modal.run
+    VITE_SUPERMEMORY_API_URL=<the URL printed by Modal>
 
 and run ``yarn dev`` in ``frontend/``.
 """
@@ -25,14 +25,14 @@ from pathlib import Path
 import modal
 
 MODEL_ID = "Qwen/Qwen3-8B"
-APP_NAME = "streaming-memory-supermemory"
+APP_NAME = "dynamic-context-supermemory"
 
 # Stable tag: memories are ingested once via scripts/ingest_supermemory.py
 # and every container cold start just attaches to them.
 CONTAINER_TAG = "family-assistant-prod"
 
 repo_root = Path(__file__).parent.parent
-package_path = repo_root / "streaming_memory"
+package_path = repo_root / "dynamic_context"
 dad_memories_path = repo_root / "examples" / "dad_memories.json"
 
 
@@ -47,24 +47,21 @@ app = modal.App(APP_NAME)
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install(
-        "torch",
-        "transformers>=4.40",
+        "torch==2.11.0",
+        "transformers==5.5.4",
         "accelerate>=0.28",
         "numpy",
         "huggingface_hub",
-        "openai",
         "fastapi",
         "uvicorn",
         "pydantic",
         "sentencepiece>=0.1.99",
-        "deepgram-sdk>=3.0",
-        "websockets",
-        "supermemory>=3.34.0",
-        pre=True,
+        "supermemory==3.34.0",
+        "httpx==0.28.1",
     )
     .run_function(download_model)
     .add_local_file(dad_memories_path, "/app/dad_memories.json")
-    .add_local_dir(package_path, "/root/streaming_memory")
+    .add_local_dir(package_path, "/root/dynamic_context")
 )
 
 
@@ -86,9 +83,9 @@ class FamilyAssistantSupermemory:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         sys.path.insert(0, "/root")
-        from streaming_memory.config import FAMILY_ASSISTANT
-        from streaming_memory.service import StreamingMemoryService
-        from streaming_memory.supermemory_pool import SupermemoryPool
+        from dynamic_context.config import FAMILY_ASSISTANT
+        from dynamic_context.service import DynamicContextService
+        from dynamic_context.supermemory_pool import SupermemoryPool
 
         print(f"Loading {MODEL_ID}...")
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
@@ -132,24 +129,18 @@ class FamilyAssistantSupermemory:
                 created_at=created_at,
             )
 
-        pool_total_tokens = sum(
-            len(self.tokenizer.encode(m.content)) for m in self.pool.memories.values()
-        )
-        print(f"Attached {len(memories)} memories ({pool_total_tokens} tokens) — no re-ingest")
-
-        self.service = StreamingMemoryService(
+        self.service = DynamicContextService(
             config=FAMILY_ASSISTANT,
             pool=self.pool,
             tokenizer=self.tokenizer,
             model=self.model,
-            pool_total_tokens=pool_total_tokens,
         )
         self.config = FAMILY_ASSISTANT
         print("Container ready — using Supermemory retrieval.")
 
-    @modal.asgi_app()
+    @modal.asgi_app(label="dynamic-context-memory")
     def serve(self):
-        from streaming_memory.api import create_app
+        from dynamic_context.api import create_app
         return create_app(
             service=self.service,
             config=self.config,

@@ -1,4 +1,4 @@
-"""Modal deployments for streaming memory."""
+"""Modal deployments for dynamic context."""
 
 
 

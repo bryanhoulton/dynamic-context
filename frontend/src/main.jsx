@@ -1,49 +1,53 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, useLocation, Navigate } from 'react-router-dom';
+import { PostHogProvider } from 'posthog-js/react';
+import { Lab } from './components/Lab';
+import Demo from './Demo';
+import PromptDemo from './PromptDemo';
+import Voice from './VoiceWebSocket';
+import { LOCAL_POOL_API, MEMORY_API } from './demo/config';
 import './index.css';
 
-import React from 'react';
+function App() {
+  const { pathname } = useLocation();
+  const path = pathname.replace(/\/+$/, '') || '/';
+  const voice = ['/voice', '/voice-ws', '/voice-livekit'].includes(path);
+  if (!voice && !['/', '/memory', '/demo', '/superdemo'].includes(path))
+    return <Navigate to="/" replace />;
+  const api = path === '/demo' ? LOCAL_POOL_API : MEMORY_API;
+  const mode = voice ? 'voice' : path === '/' ? 'prompt' : 'memory';
+  return (
+    <Lab mode={mode}>
+      {voice ? (
+        <Voice />
+      ) : mode === 'prompt' ? (
+        <PromptDemo />
+      ) : (
+        <Demo key={api} api={api} />
+      )}
+    </Lab>
+  );
+}
 
-import { PostHogProvider } from 'posthog-js/react';
-import ReactDOM from 'react-dom/client';
-import {
-  BrowserRouter,
-  Route,
-  Routes,
-} from 'react-router-dom';
-
-import AryanDemo from './AryanDemo';
-import Demo from './Demo';
-import { SUPERMEMORY_API_URL } from './demo/config';
-import Landing from './Landing';
-import VoiceDemo from './VoiceDemo';
-import VoiceLiveKit from './VoiceLiveKit';
-import VoiceWebSocket from './VoiceWebSocket';
-
-const options = {
-  api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
-};
-
-ReactDOM.createRoot(document.getElementById("root")).render(
+const app = (
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);
+createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <PostHogProvider
-      apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
-      options={options}
-    >
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/demo" element={<Demo />} />
-          <Route
-            path="/superdemo"
-            element={
-              <Demo apiUrl={SUPERMEMORY_API_URL} />
-            }
-          />
-          <Route path="/aryan" element={<AryanDemo />} />
-          <Route path="/voice" element={<VoiceDemo />} />
-          <Route path="/voice-livekit" element={<VoiceLiveKit />} />
-          <Route path="/voice-ws" element={<VoiceWebSocket />} />
-        </Routes>
-      </BrowserRouter>
-    </PostHogProvider>
-  </React.StrictMode>
+    {import.meta.env.VITE_PUBLIC_POSTHOG_KEY ? (
+      <PostHogProvider
+        apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
+        options={{
+          api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
+        }}
+      >
+        {app}
+      </PostHogProvider>
+    ) : (
+      app
+    )}
+  </React.StrictMode>,
 );

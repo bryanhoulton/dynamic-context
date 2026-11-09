@@ -14,12 +14,12 @@ import modal
 # Configuration
 MODEL_ID = "Qwen/Qwen3-8B"
 EMBEDDING_MODEL_ID = "BAAI/bge-small-en-v1.5"
-APP_NAME = "streaming-memory"
+APP_NAME = "dynamic-context"
 
 # Paths
 data_path = Path(__file__).parent.parent / "examples"
 dad_memories_path = data_path / "dad_memories.json"
-package_path = Path(__file__).parent.parent / "streaming_memory"
+package_path = Path(__file__).parent.parent / "dynamic_context"
 
 
 def download_model():
@@ -57,7 +57,7 @@ image = (
     .run_function(download_model)
     .run_function(download_embedding_model)
     .add_local_file(dad_memories_path, "/app/dad_memories.json")
-    .add_local_dir(package_path, "/root/streaming_memory")
+    .add_local_dir(package_path, "/root/dynamic_context")
 )
 
 
@@ -66,10 +66,10 @@ image = (
     gpu="A100",
     timeout=600,
     scaledown_window=300,
-    min_containers=1,
+    min_containers=0,
 )
 class FamilyAssistant:
-    """Family Assistant with streaming memory using local embeddings."""
+    """Family Assistant with dynamic context using local embeddings."""
 
     @modal.enter()
     def startup(self):
@@ -80,10 +80,10 @@ class FamilyAssistant:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         sys.path.insert(0, "/root")
-        from streaming_memory import MemoryPool
-        from streaming_memory.config import FAMILY_ASSISTANT
-        from streaming_memory.embeddings import create_embedder
-        from streaming_memory.service import StreamingMemoryService
+        from dynamic_context import MemoryPool
+        from dynamic_context.config import FAMILY_ASSISTANT
+        from dynamic_context.embeddings import create_embedder
+        from dynamic_context.service import DynamicContextService
 
         # Load LLM
         print(f"🚀 Loading {MODEL_ID}...")
@@ -140,26 +140,20 @@ class FamilyAssistant:
                 created_at=created_at,
             )
 
-        # Calculate total tokens
-        all_memory_text = "\n".join([f"- {m['content']}" for m in memories])
-        pool_total_tokens = len(self.tokenizer.encode(all_memory_text))
-        print(f"  ✅ Loaded {len(memories)} memories ({pool_total_tokens} tokens)")
-
         # Create service
-        self.service = StreamingMemoryService(
+        self.service = DynamicContextService(
             config=FAMILY_ASSISTANT,
             pool=self.pool,
             tokenizer=self.tokenizer,
             model=self.model,
-            pool_total_tokens=pool_total_tokens,
         )
 
         self.config = FAMILY_ASSISTANT
         print("🟢 Container ready - using local BGE embeddings!")
 
-    @modal.asgi_app()
+    @modal.asgi_app(label="dynamic-context-local")
     def serve(self):
-        from streaming_memory.api import create_app
+        from dynamic_context.api import create_app
         return create_app(
             service=self.service,
             config=self.config,

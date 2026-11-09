@@ -1,132 +1,163 @@
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BookOpen, Check, Copy, Square } from 'lucide-react';
+import { Chat, ChatInput, ChatTurn } from './components/Chat';
+import { InputGroupButton } from './components/ui/input-group';
+import { Highlighted, Reasoning } from './components/Lab';
+import { useDynamicContextDemo } from './hooks/useDynamicContextDemo';
+import { emptyRun, modelContext, readEvent } from './demo/stream';
+import { questions } from './demo/config';
+import example from './demo/memory-example.json';
 
-import ConversationPane from './components/demo/ConversationPane';
-import EnginePane from './components/demo/EnginePane';
-import SettingsPanel from './components/demo/SettingsPanel';
-import { DEMO_CONFIG } from './demo/config';
-import { useStreamingMemoryDemo } from './hooks/useStreamingMemoryDemo';
-
-export default function Demo({ apiUrl, label } = {}) {
-  const {
-    messages,
-    input,
-    setInput,
-    isStreaming,
-    showSettings,
-    setShowSettings,
-    waitingForFirstToken,
-    updateFrequency,
-    setUpdateFrequency,
-    maxMemories,
-    setMaxMemories,
-    lookbackTokens,
-    setLookbackTokens,
-    generatedTokens,
-    liveStreamingTokens,
-    liveAllTokens,
-    uniqueMemoriesCount,
-    memoryUpdates,
-    currentMemories,
-    thinking,
-    thinkingPrefix,
-    revisions,
-    activeRevisionId,
-    contextSnapshot,
-    inputRef,
-    chatRef,
-    lastMessageRef,
-    handleScroll,
-    sendMessage,
-  } = useStreamingMemoryDemo(apiUrl);
-
-  const hasMessages = messages.length > 0;
-
+function MemoryText({ text }) {
+  // Key by the actual line so a retained note stays still when others are replaced.
+  const counts = new Map();
   return (
-    <div className="h-screen overflow-hidden bg-white text-[#1a1a1a]">
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b border-[#eee] px-6 py-3">
-          <div className="flex items-center gap-6">
-            <Link
-              to="/"
-              className="text-xs text-[#999] transition hover:text-[#666]"
-            >
-              Back
-            </Link>
-            <div className="h-4 w-px bg-[#eee]" />
-            <span className="text-xs text-[#999]">
-              {label || DEMO_CONFIG.name}
-            </span>
-          </div>
+    <span className="memory-text" aria-label="Retrieved memories">
+      {text.match(/[^\n]*\n|[^\n]+$/g)?.map((line) => {
+        const occurrence = (counts.get(line) ?? 0) + 1;
+        counts.set(line, occurrence);
+        return <span key={line + occurrence}>{line}</span>;
+      })}
+    </span>
+  );
+}
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="text-xs text-[#999] transition hover:text-[#666]"
-            >
-              Settings
-            </button>
-            <SettingsPanel
-              open={showSettings}
-              isStreaming={isStreaming}
-              updateFrequency={updateFrequency}
-              setUpdateFrequency={setUpdateFrequency}
-              maxMemories={maxMemories}
-              setMaxMemories={setMaxMemories}
-              lookbackTokens={lookbackTokens}
-              setLookbackTokens={setLookbackTokens}
-            />
-          </div>
-        </div>
+function CopyContext({ run }) {
+  const [status, setStatus] = useState('');
+  useEffect(() => {
+    if (!status) return;
+    const timer = setTimeout(() => setStatus(''), 2000);
+    return () => clearTimeout(timer);
+  }, [status]);
+  return (
+    <button
+      className="copy-context"
+      type="button"
+      aria-label={status || 'Copy exact model context'}
+      title={status || 'Copy exact model context'}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(modelContext(run));
+          setStatus('Copied');
+        } catch {
+          setStatus('Copy failed');
+        }
+      }}
+    >
+      {status === 'Copied' ? <Check size={15} /> : <Copy size={15} />}
+      {status === 'Copy failed' && status}
+    </button>
+  );
+}
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(560px,3fr)_minmax(340px,2fr)]">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="min-h-0 border-r border-[#eee] p-6"
-          >
-            <EnginePane
-              contextSnapshot={contextSnapshot}
-              activeRevisionId={activeRevisionId}
-              revisions={revisions}
-              generatedTokens={generatedTokens}
-              liveStreamingTokens={liveStreamingTokens}
-              liveAllTokens={liveAllTokens}
-              currentMemories={currentMemories}
-              uniqueMemoriesCount={uniqueMemoriesCount}
-              memoryUpdates={memoryUpdates}
-            />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.05 }}
-            className="flex min-h-0 flex-col p-6"
-          >
-            <ConversationPane
-              hasMessages={hasMessages}
-              messages={messages}
-              input={input}
-              setInput={setInput}
-              sendMessage={sendMessage}
-              isStreaming={isStreaming}
-              waitingForFirstToken={waitingForFirstToken}
-              thinking={thinking}
-              thinkingPrefix={thinkingPrefix}
-              inputRef={inputRef}
-              chatRef={chatRef}
-              lastMessageRef={lastMessageRef}
-              handleScroll={handleScroll}
-              placeholder={DEMO_CONFIG.placeholder}
-              headline={DEMO_CONFIG.headline}
-              description={DEMO_CONFIG.description}
-              suggestedQuestions={DEMO_CONFIG.suggestedQuestions}
-            />
-          </motion.div>
-        </div>
-      </div>
-    </div>
+export default function Demo({ api }) {
+  const lab = useDynamicContextDemo(api);
+  const [frame, setFrame] = useState(null);
+  const recorded = frame !== null;
+  const playing = recorded && frame < example.length - 1;
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setTimeout(() => setFrame(frame + 1), 950);
+    return () => clearTimeout(timer);
+  }, [frame, playing]);
+  const run = recorded
+    ? example.slice(0, frame + 1).reduce(readEvent, emptyRun())
+    : lab.run;
+  const busy = lab.busy;
+  function send(e) {
+    e.preventDefault();
+    if (!lab.input.trim() || busy) return;
+    setFrame(null);
+    lab.send();
+  }
+  const tools = (
+    <>
+      {!run && (
+        <button
+          type="button"
+          className="link"
+          onClick={() =>
+            lab.setInput(
+              questions[(questions.indexOf(lab.input) + 1) % questions.length],
+            )
+          }
+        >
+          Another question
+        </button>
+      )}
+      {recorded ? (
+        <button type="button" className="link" onClick={() => setFrame(null)}>
+          Close recorded example
+        </button>
+      ) : (
+        !busy && (
+          <button type="button" className="link" onClick={() => setFrame(0)}>
+            See a recorded example
+          </button>
+        )
+      )}
+    </>
+  );
+  return (
+    <Chat
+      title="Ask the family notebook."
+      icon={BookOpen}
+      description="Blue text shows the memories at the start of the model’s reasoning. Every 10 reasoning tokens, a new lookup can replace them."
+      empty={!run}
+      busy={busy || playing}
+      composer={
+        <ChatInput
+          label="Question"
+          value={lab.input}
+          readOnly={busy}
+          onChange={lab.setInput}
+          onSubmit={send}
+          placeholder={busy ? 'Generating a response…' : 'Ask a new question…'}
+          action="Send"
+          tools={tools}
+          control={
+            busy ? (
+              <InputGroupButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={lab.stop}
+              >
+                <Square /> Stop run
+              </InputGroupButton>
+            ) : undefined
+          }
+        />
+      }
+    >
+      {run && (
+        <ChatTurn id="memory" question={run.message}>
+          {run.prefix && (
+            <Reasoning title="Reasoning" expanded>
+              <MemoryText text={run.memory} />
+              <Highlighted text={run.thinking} range={run.range} />
+            </Reasoning>
+          )}
+          {run.answer && <p className="answer">{run.answer}</p>}
+          {run.prefix && <CopyContext run={run} />}
+          {busy && !run.prefix && (
+            <p role="status" className="muted">
+              Retrieving memories…
+            </p>
+          )}
+          {run.limited && (
+            <p className="muted">The model reached its output limit.</p>
+          )}
+          {run.status === 'stopped' && (
+            <p role="status" className="muted">
+              Run stopped.
+            </p>
+          )}
+          {run.status === 'error' && (
+            <p role="alert">The run was interrupted. {run.error}</p>
+          )}
+        </ChatTurn>
+      )}
+    </Chat>
   );
 }
