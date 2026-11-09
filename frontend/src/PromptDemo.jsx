@@ -236,7 +236,7 @@ export default function PromptDemo() {
         aria-describedby="intro-copy"
         onClose={closeIntro}
       >
-        <h2 id="intro-title">Dynamic context</h2>
+        <h2 id="intro-title">Dynamic context engineering</h2>
         <p id="intro-copy">
           What happens when you change what a model sees while it’s reasoning?
           Try it with a prompt you can edit, memories it can retrieve, or words

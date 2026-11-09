@@ -6,7 +6,7 @@ export function Lab({ mode, children }) {
     <>
       <header className="topbar">
         <Link className="wordmark" to="/">
-          Dynamic context
+          Dynamic context engineering
         </Link>
         <nav aria-label="Experiments">
           <Link aria-current={mode === 'prompt' ? 'page' : undefined} to="/">

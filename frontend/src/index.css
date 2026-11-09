@@ -250,7 +250,7 @@ mark {
   }
   .wordmark {
     font-size: 18px;
-    white-space: nowrap;
+    text-wrap: balance;
   }
   .workspace {
     width: calc(100% - 26px);

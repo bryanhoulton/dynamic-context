@@ -1,6 +1,8 @@
-# Dynamic Context
+# Dynamic context engineering
 
 Three interactive experiments ask the same question: what happens if part of a language model’s input can change *after* decoding starts?
+
+[Open the demos](https://context.bryanhoulton.com/).
 
 | Experiment | What changes the prompt? | What to inspect |
 | --- | --- | --- |
