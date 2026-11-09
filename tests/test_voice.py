@@ -19,11 +19,11 @@ class VoicePromptTests(unittest.TestCase):
     def test_reuses_recent_user_and_assistant_turns_within_the_model_window(self):
         tokenizer = CharacterTokenizer()
         history = [("obsolete" * 900, "earliest reply"), ("Remember Lima.", "I will.")]
-        turn = VoiceTurn(2, "Which city?", final=True, plan_ids=tokenizer.encode("Recall the city."))
+        turn = VoiceTurn(2, "Which city?", final=True, plan="Recall the city.", plan_ids=tokenizer.encode("Recall the city."))
         text = tokenizer.decode(voice_input(tokenizer, history, turn, True))
         self.assertNotIn("obsolete", text)
-        self.assertIn("<user>Remember Lima.<assistant>I will.<user>Which city?", text)
-        self.assertTrue(text.endswith("<think>\nRecall the city.\n</think>\n\n"))
+        self.assertIn("<user>Remember Lima.<assistant>I will.", text)
+        self.assertTrue(text.endswith("Recall the city.<user>Which city?<assistant><think>\n</think>\n\n"))
         turn.transcript = "word " * 1500 + "last words"
         ids = voice_input(tokenizer, history, turn, False)
         self.assertLessEqual(len(ids) + CHUNK_TOKENS, CONTEXT_TOKENS)

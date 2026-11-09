@@ -26,10 +26,13 @@ class VoiceTurn:
 
 def voice_input(tokenizer, history, turn, answering):
     """Retain generated IDs as the transcript changes. Drop oldest whole turns to fit."""
-    suffix = turn.plan_ids
     if answering:
-        close = tokenizer.encode("\n</think>\n\n", add_special_tokens=False)
-        suffix = [*suffix, *close, *turn.reply_ids]
+        # The confirmed user message follows the provisional plan. Prefilling an
+        # answer directly after an early guess can cause Qwen to answer that guess.
+        close = tokenizer.encode("</think>\n\n", add_special_tokens=False)
+        suffix = close + turn.reply_ids
+    else:
+        suffix = turn.plan_ids
     room = CONTEXT_TOKENS - CHUNK_TOKENS - len(suffix)
     text = turn.transcript
     instruction = SYSTEM + " " + (ANSWERING if answering else PLANNING)
@@ -39,6 +42,8 @@ def voice_input(tokenizer, history, turn, answering):
             messages.append({"role": "user", "content": user})
             if assistant:
                 messages.append({"role": "assistant", "content": assistant})
+        if answering and turn.plan:
+            messages.append({"role": "assistant", "content": "Provisional reasoning while listening:\n" + turn.plan})
         messages.append({"role": "user", "content": text})
         prefix = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         if not prefix.rstrip().endswith("<think>"):
@@ -89,7 +94,10 @@ class VoiceConversation:
                 self.changed.clear()
                 answering = turn.final
                 ids = turn.reply_ids if answering else turn.plan_ids
-                budget = (REPLY_TOKENS if answering else PLAN_TOKENS) - len(ids)
+                # Pace the provisional trace with incoming speech so the model
+                # cannot spend its whole reasoning budget on the first word.
+                plan_budget = min(PLAN_TOKENS, 3 * len(turn.transcript.split()) + 3)
+                budget = (REPLY_TOKENS if answering else plan_budget) - len(ids)
                 if budget <= 0:
                     break
                 source = turn.transcript
